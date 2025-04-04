@@ -18,6 +18,7 @@ int file = -1;
 void init(void);
 void list_available_files(void);
 void cleanup(void);
+void files_cmd();
 
 
 char *concat(char buffer[511],char str1[255],char str2[255]) {
@@ -64,7 +65,7 @@ void selectfile(char string[255]) {
 }
 
 
-void creat_file(char string[255]) {
+void create_file(char string[255]) {
     int i = 0;
     char* header;
     char name[511];
@@ -239,7 +240,7 @@ int remLine(char *filename, int line_to_remove) {
 void list_available_files() {
     printf("Available files:\n");
     int found_any = 0;
-    for (int i = 0; i < MAX_FILES; ++i) {
+    for (int i = 0; i < MAX_FILES; i++) {
         if (files[i] != NULL) {
             char display_name[256];
             const char *start_of_base = strrchr(files[i], '/');
@@ -251,8 +252,10 @@ void list_available_files() {
             }
             strncpy(display_name, start_of_base, sizeof(display_name) - 1);
             display_name[sizeof(display_name) - 1] = '\0';
-            size_t txt_pos = strcspn(display_name, ".txt");
-            display_name[txt_pos] = '\0';
+            char *dot = strstr(display_name, ".txt");
+            if (dot != NULL && dot == display_name + strlen(display_name) - 4) {
+                *dot = '\0'; // Place null terminator where '.' was found
+            }
             printf("  %s\n", display_name);
             found_any = 1;
         }
@@ -348,7 +351,7 @@ void print_help() {
     printf("  select <name>       - Selects an existing list\n");
     printf("  push <description>  - Add task to the selected list\n");
     printf("  tick <line number>  - Remove task by line number from selected list\n");
-    printf("  delete              - Clears all tasks from selected list\n");
+    printf("  clear               - Clears all tasks from selected list\n");
     printf("  list                - Refresh and show tasks in current list\n");
     printf("  help                - Show this help message\n");
     printf("  quit                - Exit the program\n");
@@ -359,7 +362,7 @@ void print_help() {
     getchar();
 }
 
-void delete(char* filename_unused) {
+void clear() {
     if (file < 0 || file >= MAX_FILES || files[file] == NULL) {
         printf("Error: No file selected. Use 'select <name>'.\n");
         return;
@@ -373,6 +376,42 @@ void delete(char* filename_unused) {
     printf("Cleared content of %s\n", files[file]);
     sleep(1);
 }
+
+void delete(char* filename) {
+    char name[511];
+    int i = 0, j;
+    int found_index = -1;
+    concat(name, TODO_DIR, filename);
+    concat(name, name, ".txt");
+    for (i = 0; i<MAX_FILES ; i++) {
+        if (files[i] != NULL && strcmp(name, files[i]) == 0) {
+            free(files[i]);
+            files[i] = NULL;
+            found_index = i;
+            break;
+        }
+    }
+    if (found_index != -1) {
+        for (j = found_index; j < MAX_FILES - 1; j++) {
+            files[j] = files[j + 1];
+        }
+        files[MAX_FILES - 1] = NULL;
+        if (file == found_index) {
+            file = -1;
+            printf("Note: The currently selected file was deleted.\n");
+        } else if (file > found_index) {
+            file--;
+        }
+    }
+    if (remove(name) != 0) {
+        fprintf(stderr, "Error deleting file '%s': ", name);
+    } else {
+        printf("Attempted to delete '%s'\n", name);
+    }
+    sleep(1);
+    files_cmd();
+}
+
 void files_cmd() {
     char files_input[255];
     char files_job[8];
@@ -393,6 +432,7 @@ void files_cmd() {
         if (files_input[0] == '\0' || files_input[0] == ' ') {
             continue;
         }
+
         parse(files_input, files_job, files_string);
         if (strcmp(files_job, "select") == 0) {
             selectfile(files_string);
@@ -401,12 +441,16 @@ void files_cmd() {
             } else {
                 continue;
             }
+        } else if (strcmp(files_job, "create") == 0) {
+            create_file(files_string);
+            sleep(1);
+        } else if (strcmp(files_job, "delete") == 0) {
+            delete(files_string);
         } else if (strcmp(files_job, "quit") == 0) {
             strcpy(job, "quit");
             return;
-        }
-        else {
-            printf("Invalid command. Use 'select <name>' to choose a file or 'quit' to exit.\n");
+        } else {
+            printf("Invalid command. Use 'select', 'create', 'delete', or 'quit'.\n");
             sleep(2);
         }
     }
@@ -419,15 +463,18 @@ void options(char job[8], char string[255]) {
         tick(NULL, string);
     } else if (strcmp(job, "help") == 0) {
         print_help();
-    } else if (strcmp(job, "delete") == 0) {
-        delete(NULL);
+    } else if (strcmp(job, "clear") == 0) {
+        clear();
     } else if (strcmp(job, "create") == 0) {
-        creat_file(string);
+        create_file(string);
     } else if (strcmp(job, "select") == 0) {
         selectfile(string);
     } else if (strcmp(job, "files") == 0) {
         files_cmd();
-    } else {
+    } else if (strcmp(job, "delete") == 0) {
+        delete(string);
+    }
+    else {
         if (job[0] != '\0') {
             printf("Unknown command: '%s'. Type 'help' for commands.\n", job);
             sleep(1);
