@@ -123,7 +123,7 @@ void create_file(char string[255]) {
     }
     strcpy(files[empty_slot], name);
     file = empty_slot;
-    printf("Created and selected '%s'.\n", string);
+    printf("Created '%s'.\n", string);
     sleep(1);
     return;
 }
@@ -254,7 +254,7 @@ void list_available_files() {
             display_name[sizeof(display_name) - 1] = '\0';
             char *dot = strstr(display_name, ".txt");
             if (dot != NULL && dot == display_name + strlen(display_name) - 4) {
-                *dot = '\0'; // Place null terminator where '.' was found
+                *dot = '\0';
             }
             printf("  %s\n", display_name);
             found_any = 1;
@@ -449,7 +449,10 @@ void files_cmd() {
         } else if (strcmp(files_job, "quit") == 0) {
             strcpy(job, "quit");
             return;
-        } else {
+        } else if (strcmp(files_job, "help") == 0) {
+            print_help();
+        }
+        else {
             printf("Invalid command. Use 'select', 'create', 'delete', or 'quit'.\n");
             sleep(2);
         }
@@ -491,6 +494,8 @@ void cleanup() {
 }
 
 void init() {
+    file = -1;
+
     for(int i=0; i<MAX_FILES; ++i) {
         files[i] = NULL;
     }
@@ -512,9 +517,6 @@ void init() {
                 files[count] = malloc(strlen(full_path) + 1);
                 if (files[count] != NULL) {
                     strcpy(files[count], full_path);
-                    if (count == 0) {
-                        file = 0;
-                    }
                     count++;
                 } else {
                     fprintf(stderr, "Failed malloc loading %s\n", full_path);
@@ -564,7 +566,10 @@ int main(){
     atexit(cleanup);
     printf("\033[2J\033[H");
     fflush(stdout);
-    run();
+    files_cmd();
+    if (strcmp(job, "quit") != 0) {
+        run();
+    }
     printf("\033[2J\033[H");
     fflush(stdout);
     return 0;
